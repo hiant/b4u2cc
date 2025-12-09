@@ -1,0 +1,31 @@
+name: Sync with upstream repository
+
+# 触发条件：每天凌晨2点自动同步，或手动触发
+on:
+  schedule:
+    - cron: '5 * * * *'  # 每天UTC时间2点执行（可根据需要调整）
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SYNC_TOKEN }}  # 用于推送的PAT令牌
+          fetch-depth: 0  # 拉取所有历史，确保能正常合并
+
+      - name: Add upstream repository
+        run: |
+          git remote add upstream https://github.com/CassiopeiaCode/b4u2cc.git
+          git fetch upstream
+
+      - name: Merge upstream changes
+        run: |
+          git checkout main  # 假设你的主分支是main
+          git merge upstream/main --allow-unrelated-histories  # 合并上游main分支
+
+      - name: Push changes to my repository
+        run: |
+          git push origin main
