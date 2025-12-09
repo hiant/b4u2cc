@@ -34,4 +34,4 @@ jobs:
 
       - name: Push changes to my repository
         run: |
-          git push origin main
+          git push https://${SYNC_TOKEN}@github.com/hiant/b4u2cc.git main
