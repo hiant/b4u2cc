@@ -83,8 +83,9 @@ async function handleMessages(req: Request, requestId: string) {
       output_tokens: tokenCount.output_tokens,
     });
 
-    // 如果有工具，先生成统一的触发信号
-    const triggerSignal = (body.tools ?? []).length > 0 ? randomTriggerSignal() : undefined;
+    // 工具解析仅由是否传入 tools 决定：存在 tools 时启用工具协议，否则禁用。
+    const hasTools = (body.tools ?? []).length > 0;
+    const triggerSignal = hasTools ? randomTriggerSignal() : undefined;
     const openaiBase = mapClaudeToOpenAI(body, config, triggerSignal);
     const injected = injectPrompt(openaiBase, body.tools ?? [], triggerSignal);
     const upstreamReq = { ...openaiBase, messages: injected.messages };
@@ -115,7 +116,8 @@ async function handleMessages(req: Request, requestId: string) {
         const claudeStream = new ClaudeStream(writer, config, requestId, tokenCount.input_tokens || tokenCount.token_count || tokenCount.tokens);
         // 发送 message_start 事件（完全按照官方格式）
         await claudeStream.init();
-        const parser = new ToolifyParser(injected.triggerSignal);
+        const thinkingEnabled = !!body.thinking && body.thinking.type === "enabled";
+        const parser = new ToolifyParser(injected.triggerSignal, thinkingEnabled);
         const decoder = new TextDecoder();
         const reader = upstreamRes.body!.getReader();
         let sseBuffer = "";
