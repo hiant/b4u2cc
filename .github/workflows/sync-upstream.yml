@@ -1,37 +1,83 @@
-name: Sync with upstream repository
+name: Sync and Deploy b4u2cc
 
-# 触发条件：每天凌晨2点自动同步，或手动触发
+# 触发条件：定时同步、手动触发
 on:
   schedule:
-    - cron: '5 * * * *'  # 每天UTC时间2点执行（可根据需要调整）
+    - cron: '5 * * * *'  # 每小时第5分钟执行（可按需调整）
   workflow_dispatch:  # 允许手动触发
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    outputs:
+      sync_success: ${{ steps.push.outputs.success }}  # 输出同步结果供部署判断
+
     steps:
-          
-      - name: Checkout your repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.SYNC_TOKEN }}  # 用于推送的PAT令牌
-          fetch-depth: 0  # 拉取所有历史，确保能正常合并
+          token: ${{ secrets.SYNC_TOKEN }}
+          fetch-depth: 0  # 拉取完整历史，确保合并成功
 
-      - name: Set up git user
+      - name: Configure git user
         run: |
           git config --local user.name "GitHub Actions"
           git config --local user.email "actions@github.com"
-          
+
       - name: Add upstream repository
         run: |
-          git remote add upstream https://github.com/CassiopeiaCode/b4u2cc.git
+          git remote add upstream https://github.com/CassiopeiaCode/b4u2cc.git || true
           git fetch upstream
 
       - name: Merge upstream changes
         run: |
-          git checkout main  # 假设你的主分支是main
-          git merge upstream/main --allow-unrelated-histories  # 合并上游main分支
+          git checkout main
+          git merge upstream/main --allow-unrelated-histories || echo "Merge conflict occurred"
 
-      - name: Push changes to my repository
+      - name: Push changes to repository
+        id: push
         run: |
-          git push https://${SYNC_TOKEN}@github.com/hiant/b4u2cc.git main
+          # 检查是否有变更需要推送
+          if git diff --quiet origin/main; then
+            echo "No changes to push"
+            echo "success=false" >> $GITHUB_OUTPUT
+          else
+            git push https://${{ secrets.SYNC_TOKEN }}@github.com/hiant/b4u2cc.git main
+            echo "success=true" >> $GITHUB_OUTPUT
+          fi
+
+  deploy:
+    needs: sync
+    if: ${{ needs.sync.outputs.sync_success == 'true' }}  # 仅同步成功时部署
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write  # Deno Deploy 认证所需
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x  # 匹配项目要求的 Deno 版本（文档中提到 1.40+）
+
+      - name: Validate project
+        run: |
+          cd deno-proxy
+          deno task check  # 使用项目定义的 check 任务验证代码（来自 deno.json）
+
+      - name: Deploy to Deno Deploy
+        uses: denoland/deployctl@v1
+        with:
+          project: "b4u2cc"  # 匹配你的 Deno 应用名称
+          entrypoint: "deno-proxy/src/main.ts"  # 入口文件（与项目结构一致）
+          root: "."
+          token: ${{ secrets.DENO_DEPLOY_TOKEN }}  # 确保已配置此密钥
+          # 传递必要的环境变量（根据项目 config.ts 需求）
+          env: |
+            UPSTREAM_BASE_URL=${{ secrets.UPSTREAM_BASE_URL }}
+            UPSTREAM_API_KEY=${{ secrets.UPSTREAM_API_KEY }}
+            PORT=3456  # 匹配项目默认端口
