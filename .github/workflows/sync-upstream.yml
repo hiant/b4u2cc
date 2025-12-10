@@ -62,22 +62,17 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x  # 匹配项目要求的 Deno 版本（文档中提到 1.40+）
-
+          deno-version: v2.x
+          
       - name: Validate project
         run: |
           cd deno-proxy
-          deno task check  # 使用项目定义的 check 任务验证代码（来自 deno.json）
+          deno cache src/main.ts
+          deno check src/main.ts
 
       - name: Deploy to Deno Deploy
         uses: denoland/deployctl@v1
         with:
-          project: "b4u2cc"  # 匹配你的 Deno 应用名称
-          entrypoint: "deno-proxy/src/main.ts"  # 入口文件（与项目结构一致）
+          project: "b4u2cc"
+          entrypoint: "deno-proxy/src/main.ts"
           root: "."
-          token: ${{ secrets.DENO_DEPLOY_TOKEN }}  # 确保已配置此密钥
-          # 传递必要的环境变量（根据项目 config.ts 需求）
-          env: |
-            UPSTREAM_BASE_URL=${{ secrets.UPSTREAM_BASE_URL }}
-            UPSTREAM_API_KEY=${{ secrets.UPSTREAM_API_KEY }}
-            PORT=3456  # 匹配项目默认端口
