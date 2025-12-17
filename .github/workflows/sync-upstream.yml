@@ -48,11 +48,11 @@ jobs:
 
   deploy:
     needs: sync
-    if: ${{ needs.sync.outputs.sync_success == 'true' }}  # 仅同步成功时部署
+    if: ${{ needs.sync.outputs.sync_success == 'true' }}
     runs-on: ubuntu-latest
 
     permissions:
-      id-token: write  # Deno Deploy 认证所需
+      id-token: write
       contents: read
 
     steps:
@@ -75,5 +75,3 @@ jobs:
         with:
           project: "b4u2cc"
           entrypoint: "deno-proxy/src/main.ts"
-          root: "."
-          token: ${{ secrets.DENO_DEPLOY_TOKEN }}
