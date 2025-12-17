@@ -76,3 +76,4 @@ jobs:
           project: "b4u2cc"
           entrypoint: "deno-proxy/src/main.ts"
           root: "."
+          token: ${{ secrets.DENO_DEPLOY_TOKEN }}
